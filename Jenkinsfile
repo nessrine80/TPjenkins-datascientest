@@ -38,7 +38,7 @@ pipeline {
         stage('Déploiement vers Kubernetes (hors prod)') {
             when {
                 not {
-                    branch 'main'
+                    branch 'master'
                 }
             }
             steps {
@@ -53,7 +53,7 @@ pipeline {
 
         stage('Déploiement production (avec validation)') {
             when {
-                branch 'main'
+                branch 'master'
             }
             steps {
                 input message: "Déployer en production ?", ok: "Déployer"
