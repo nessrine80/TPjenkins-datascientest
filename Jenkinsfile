@@ -16,8 +16,17 @@ pipeline {
 
         stage('Build des images Docker') {
             steps {
-                sh 'docker build -t $DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG ./movie-service'
-                sh 'docker build -t $DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG ./cast-service'
+                withCredentials([usernamePassword(
+                    credentialsId: "${DOCKERHUB_CREDENTIALS_ID}",
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker build -t $DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG ./movie-service
+                        docker build -t $DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG ./cast-service
+                    '''
+                }
             }
         }
 
@@ -28,9 +37,11 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh 'docker push $DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG'
-                    sh 'docker push $DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG'
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG
+                        docker push $DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
+                    '''
                 }
             }
         }
