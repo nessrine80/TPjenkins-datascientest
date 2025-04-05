@@ -5,6 +5,7 @@ pipeline {
         DOCKERHUB_USERNAME = 'nessrine80' 
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        KUBECONFIG = "${WORKSPACE}/kubeconfig" // pour Helm & kubectl
     }
 
     stages {
@@ -48,17 +49,17 @@ pipeline {
 
         stage('Déploiement vers Kubernetes (hors prod)') {
             when {
-                not {
-                    branch 'master'
-                }
+                not { branch 'master' }
             }
             steps {
-                sh '''
-                helm upgrade --install movie-app ./movie-app \
-                  --namespace dev \
-                  --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
-                  --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
-                '''
+                withCredentials([file(credentialsId: 'kubeconfig-dev', variable: 'KUBECONFIG')]) {
+                    sh '''
+                        helm upgrade --install movie-app ./charts/movie-app \
+                          --namespace dev \
+                          --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
+                          --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
+                    '''
+                }
             }
         }
 
@@ -68,12 +69,14 @@ pipeline {
             }
             steps {
                 input message: "Déployer en production ?", ok: "Déployer"
-                sh '''
-                helm upgrade --install movie-app ./movie-app \
-                  --namespace prod \
-                  --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
-                  --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
-                '''
+                withCredentials([file(credentialsId: 'kubeconfig-dev', variable: 'KUBECONFIG')]) {
+                    sh '''
+                        helm upgrade --install movie-app ./charts/movie-app \
+                          --namespace prod \
+                          --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
+                          --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
+                    '''
+                }
             }
         }
     }
