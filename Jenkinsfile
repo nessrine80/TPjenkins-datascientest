@@ -1,10 +1,11 @@
-pipeline {
+pipeline {  
     agent any
 
     environment {
         DOCKERHUB_USERNAME = 'nessrine80' 
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
+        KUBECONFIG = "${WORKSPACE}/kubeconfig"  // kubeconfig temporaire pour kubectl & helm
     }
 
     stages {
@@ -38,31 +39,35 @@ pipeline {
         stage('Déploiement vers Kubernetes (hors prod)') {
             when {
                 not {
-                    branch 'master'
+                    branch 'main'
                 }
             }
             steps {
-                sh '''
-                helm upgrade --install movie-app ./movie-app \
-                  --namespace dev \
-                  --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
-                  --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
-                '''
+                withCredentials([file(credentialsId: 'kubeconfig-dev', variable: 'KUBECONFIG')]) {
+                    sh '''
+                    helm upgrade --install movie-app ./movie-app \
+                      --namespace dev \
+                      --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
+                      --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
+                    '''
+                }
             }
         }
 
         stage('Déploiement production (avec validation)') {
             when {
-                branch 'master'
+                branch 'main'
             }
             steps {
                 input message: "Déployer en production ?", ok: "Déployer"
-                sh '''
-                helm upgrade --install movie-app ./movie-app \
-                  --namespace prod \
-                  --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
-                  --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
-                '''
+                withCredentials([file(credentialsId: 'kubeconfig-dev', variable: 'KUBECONFIG')]) {
+                    sh '''
+                    helm upgrade --install movie-app ./movie-app \
+                      --namespace prod \
+                      --set movieService.image=$DOCKERHUB_USERNAME/movie_service:$IMAGE_TAG \
+                      --set castService.image=$DOCKERHUB_USERNAME/cast_service:$IMAGE_TAG
+                    '''
+                }
             }
         }
     }
